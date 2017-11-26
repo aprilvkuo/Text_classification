@@ -11,6 +11,7 @@
 @file: Main.py
 @time: 2017/11/26 下午1:40
 """
+import numpy as np
 import DataProcess, gensim
 from gensim import corpora
 from sklearn.linear_model import LogisticRegression
@@ -30,7 +31,11 @@ def evaluate(x, y, class_name=LogisticRegression):
 if __name__ == '__main__':
     models = [LogisticRegression, ensemble.RandomForestClassifier, svm.LinearSVC]
     y, class_map = DataProcess.class_counting()
+    y = y.astype(np.int64)
+    print y.dtype, type(y)
+    print class_map
+    print np.bincount(np.array(y))
     X = pickle.load(open('./model/feature_selected.mm', 'r'))
     for item in models:
-        evaluate(X, y,item)
+        evaluate(X, y, item)
 
