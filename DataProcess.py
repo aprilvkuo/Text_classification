@@ -19,9 +19,14 @@ import numpy as np
 import pandas as pd
 import pickle
 from gensim import corpora, models
+from sklearn.feature_selection import chi2,SelectKBest
 
 
 class Corpus(object):
+    """
+     语料库的generator
+    """
+
     def __init__(self,dir_name):
         self.dir_name = dir_name
 
@@ -36,11 +41,20 @@ class Corpus(object):
 
 
 def segment(line):
+    """
+    结巴分词调用
+    :param line: 
+    :return: 
+    """
     return list(jieba.cut(line))
 
 
-def build_dic():
-    dictionary = corpora.Dictionary(line for line in Corpus('./data/answer'))
+def build_dic(address='./data/answer'):
+    """
+    建立字典并保存
+    :return: 
+    """
+    dictionary = corpora.Dictionary(line for line in Corpus(address))
     once_ids = [tokenid for tokenid, docfreq in iteritems(dictionary.dfs) if docfreq == 1]
     dictionary.filter_tokens(once_ids)  # remove stop words and words that appear only once
     dictionary.compactify()  # remove gaps in id sequence after words that were removed
@@ -49,6 +63,11 @@ def build_dic():
 
 
 def doc2bow_vectoring(dictionary=None):
+    """
+    在字典上建立vsm
+    :param dictionary: 
+    :return: 
+    """
     if not dictionary:
         dictionary = corpora.Dictionary.load('./model/dict.model')
     corpus = [dictionary.doc2bow(text) for text in Corpus('./data/answer')]
@@ -57,6 +76,11 @@ def doc2bow_vectoring(dictionary=None):
 
 
 def train_tf_idf(corpus=None):
+    """
+    在语料库上训练tf-idf模型
+    :param corpus: 
+    :return: 
+    """
     if corpus is None:
         corpus = corpora.MmCorpus('./model/corpora_doc2bow.mm')
     tf_idf = models.TfidfModel(corpus)
@@ -65,6 +89,13 @@ def train_tf_idf(corpus=None):
 
 
 def corpus_vectoring(corpus=None, method='tf_idf', model=None):
+    """
+    将语料库向量化，这里可以用tf—idf，也可以用lda等
+    :param corpus: 
+    :param method: 
+    :param model: 
+    :return: 
+    """
     if corpus is None:
         corpus = corpora.MmCorpus('./model/corpora_doc2bow.mm')
     if model is None:
@@ -74,8 +105,6 @@ def corpus_vectoring(corpus=None, method='tf_idf', model=None):
             model = None
     corpus_tf_idf = model[corpus]
     corpora.MmCorpus.serialize('./model/corpus_'+method+'_vector.mm', corpus_tf_idf)
-    numpy_matrix = gensim.matutils.corpus2dense(corpus, num_terms=corpus.num_terms).transpose()
-    pickle.dump(numpy_matrix,open('./model/corpus_'+method+'_vector.mat','w'))
     return corpus
 
 
@@ -96,16 +125,18 @@ def class_counting(dir_name='./data/answer'):
     # return class_cnt
     return y, class_map
 
+def feature_select():
+    """
+    特征选择，现在默认用filter模型选择卡方检验前5000个特征
+    :return: 
+    """
+    y, class_map = class_counting()
+    corpus = corpora.MmCorpus('./model/corpus_tf_idf_vector.mm')
+    numpy_matrix = gensim.matutils.corpus2dense(corpus, num_terms=corpus.num_terms).transpose()
+    X = numpy_matrix
+    X = SelectKBest(chi2, k=5000).fit_transform(X, y)
+    pickle.dump(X, open("./model/feature_selected.mm", 'w'))
 
-def data_process(docs):
-    results = pickle.load(open('loaded_files.done','r'))
-    docs, class_cnt = results[0], results[1]
-    model = TfidfVectorizer(input='content', tokenizer=segment, analyzer='word',encoding='gbk')
-    X = model.fit_transform(docs)
-    pickle.dump([X,model],open('tf-idf.model'))
-
-
-corpus_vectoring()
 
 
 
